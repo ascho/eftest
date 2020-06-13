@@ -5,7 +5,7 @@
             [leiningen.core.project :as project]))
 
 (def eftest-profile
-  {:dependencies '[[eftest "0.4.1"]]})
+  {:dependencies '[[eftest "0.5.9"]]})
 
 (defn- report-namespace [project]
   (if-let [reporter (get-in project [:eftest :report])]
@@ -38,7 +38,7 @@
                                                             selector#)]
                                                  (apply sfn#
                                                         (merge (-> var# meta :ns meta)
-                                                               (assoc (meta var#) ::var var#))
+                                                               (assoc (meta var#) :leiningen.test/var var#))
                                                         args#)))
                                              selectors#)))))
            copy#      #(doseq [v# vars#] (copy-meta# v# %1 %2))]
@@ -63,7 +63,7 @@
                                      (second selector#)
                                      selector#)
                                    (merge (-> var# meta :ns meta)
-                                          (assoc (meta var#) ::var var#))
+                                          (assoc (meta var#) :leiningen.test/var var#))
                                    args#))
                           ~selectors)]
       ns#)))
@@ -100,9 +100,9 @@
 (defn eftest
   "Run the project's tests with Eftest."
   [project & tests]
-  (let [[nses selectors] (test/read-args tests project)
-        profiles         [:leiningen/test :test eftest-profile]
+  (let [profiles         [:leiningen/test :test eftest-profile]
         project          (project/merge-profiles project profiles)
+        [nses selectors] (test/read-args tests project)
         form             (testing-form project nses selectors)]
     (try
       (when-let [n (eval/eval-in-project project form (require-form project))]

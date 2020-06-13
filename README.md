@@ -1,17 +1,19 @@
 # Eftest
 
+[![Build Status](https://travis-ci.org/weavejester/eftest.svg?branch=master)](https://travis-ci.org/weavejester/eftest)
+
 Eftest is a fast and pretty Clojure test runner.
 
 ## Installation
 
 To install, add the following to your project `:dependencies`:
 
-    [eftest "0.4.1"]
+    [eftest "0.5.9"]
 
 Alternatively, if you just want to use Eftest as a `lein test`
 replacement, add the following to your project `:plugins`:
 
-    [lein-eftest "0.4.1"]
+    [lein-eftest "0.5.9"]
 
 ## Screenshots
 
@@ -53,12 +55,29 @@ The above example will run all tests found in the "test" directory.
 
 #### Multithreading
 
-By default Eftest runs tests in parallel, which can cause issues with
-tests that expect to be single-threaded. To disable this, set the
-`:multithread?` option to `false`:
+By default Eftest runs all tests in parallel, which can cause issues
+with tests that expect to be single-threaded. To disable this and set
+all tests to be executed in serial, set the `:multithread?` option to
+`false`:
 
 ```clojure
 user=> (run-tests (find-tests "test") {:multithread? false})
+```
+
+If you want the test vars inside a namespace to be executed in
+parallel, but the namespaces themselves to be executed in serial, then
+set the `:multithread?` option to `:vars`:
+
+```clojure
+user=> (run-tests (find-tests "test") {:multithread? :vars})
+```
+
+If you want the vars inside a namespace to execute in serial, but the
+namespaces to be executed in parallel, set the `:multithread?` option
+to `:namespaces`:
+
+```clojure
+user=> (run-tests (find-tests "test") {:multithread? :namespaces})
 ```
 
 Alternatively, you can add the `:eftest/synchronized` key as metadata
@@ -77,6 +96,29 @@ Or you can synchronize the entire namespace:
             [foo.core :refer :all]))
 ```
 
+##### Setting the number of threads used
+
+When multithreading is enabled, Eftest uses a single fixed-threadpool
+[`ExecutorService`][executorservice] to run all selected tests.
+
+By default, Eftest will instantiate the threadpool with the number of processors
+(cores) available to the JVM, as reported by
+[`Runtime.availableProcessors`][availableprocessors]. (NB: in some
+circumstances, such as [in a CircleCI test container][resource-class],
+`Runtime.availableProcessors` returns an erroneous value.)
+
+[executorservice]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/ExecutorService.html
+[availableprocessors]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Runtime.html#availableProcessors()
+[resource-class]: https://circleci.com/docs/2.0/configuration-reference/#resource_class
+
+Users can override the default behavior by including the key `:thread-count`
+in the options map supplied to `run-tests` with the value being any
+positive integer:
+
+```clojure
+user=> (run-tests (find-tests "test") {:thread-count 4})
+```
+
 #### Reporting
 
 You can also change the reporting function used. For example, if you
@@ -89,7 +131,7 @@ user=> (run-tests (find-tests "test") {:report eftest.report.pretty/report})
 Or JUnit output:
 
 ```clojure
-user=> (run-tests (find-tests "test") {:report clojure.report.junit/report})
+user=> (run-tests (find-tests "test") {:report eftest.report.junit/report})
 ```
 
 Or maybe you just want the old Clojure test reporter:
@@ -102,9 +144,9 @@ If you want to redirect reporting output to a file, use the
 `eftest.report/report-to-file` function:
 
 ```clojure
-user=> (require '[clojure.report :refer [report-to-file]])
+user=> (require '[eftest.report :refer [report-to-file]])
 nil
-user=> (require '[clojure.report.junit :as ju])
+user=> (require '[eftest.report.junit :as ju])
 nil
 user=> (run-tests (find-tests "test") {:report (report-to-file ju/report "test.xml")})
 ```
@@ -160,12 +202,13 @@ To use the Lein-Eftest plugin, just run:
 lein eftest
 ```
 
-You can customize the reporter and set the concurrency by adding an
-`:eftest` key to your project map:
+You can customize the reporter and configure the concurrency settings
+by adding an `:eftest` key to your project map:
 
 ```clojure
-:eftest {:multithread? false
-         :report clojure.report.junit/report
+:eftest {:multithread? :vars
+         :thread-count 4
+         :report eftest.report.junit/report
          ;; You can optionally write the output to a file like so:
          :report-to-file "target/junit.xml"}
 ```
@@ -184,7 +227,7 @@ lein eftest :integration
 
 ## License
 
-Copyright © 2017 James Reeves
+Copyright © 2019 James Reeves
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
